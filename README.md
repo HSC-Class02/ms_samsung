@@ -1,6 +1,6 @@
 # Samsung Electronics DART Financial Agent
 
-🔗 **[대시보드 바로가기](./dashboard/)**
+🔗 **[대시보드 바로가기](https://hsc-class02.github.io/ms_samsung/)**
 
 삼성전자 정기보고서(사업보고서·반기보고서·분기보고서)를 DART OpenDART API로 수집하고 재무지표와 재무비율을 자동 계산하는 프로젝트입니다.
 
