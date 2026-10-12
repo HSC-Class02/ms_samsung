@@ -146,7 +146,11 @@ def matches(row, metric):
     return name in ALIASES[metric]
 
 def choose(rows, metric, code):
-    candidates = [r for r in rows if matches(r, metric) and r.get("amount") is not None]
+    candidates = [r for r in rows if matches(r, metric) and (
+        r.get("amount") is not None or
+        (code == REPORTS["half"] and r.get("cumulative_amount") is not None
+         and metric in {"revenue", "operating_profit", "net_income", "eps"})
+    )]
     if not candidates:
         return None
     candidates.sort(key=lambda r: (
