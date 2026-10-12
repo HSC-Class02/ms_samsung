@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Sync latest repository changes
+        run: git pull --rebase origin main
+
       - name: Collect DART data and build report
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
@@ -45,7 +48,6 @@ jobs:
           else
             git commit -m "chore: update DART financial data and analysis"
           fi
-          git pull --rebase origin main
           git push origin main
 
       - uses: actions/configure-pages@v5
