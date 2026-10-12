@@ -183,6 +183,10 @@ def normalize(rows, year, code):
 
 def validation_issues(row):
     issues = []
+    required = ["revenue", "operating_profit", "net_income", "assets", "liabilities", "equity"]
+    missing = [key for key in required if row.get(key) is None]
+    if missing:
+        issues.append("필수 항목 누락: " + ", ".join(missing))
     assets, liabilities, equity = row.get("assets"), row.get("liabilities"), row.get("equity")
     if assets is not None and liabilities is not None and equity is not None:
         if assets <= 0 or liabilities < 0 or equity <= 0:
