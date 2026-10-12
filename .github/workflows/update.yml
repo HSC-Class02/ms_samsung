@@ -1,6 +1,14 @@
 name: DART Financial Agent
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update.yml"
+      - "scripts/**"
+      - "dashboard/index.html"
+      - "config/**"
+      - "requirements.txt"
   schedule:
     - cron: "0 0 1 * *"
   workflow_dispatch:
