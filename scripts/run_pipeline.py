@@ -353,9 +353,9 @@ def collect_peers():
 
 def main():
     raw = []
-    for year in range(CFG["start_year"], datetime.now().year + 1):
+    for year in range(max(2015, CFG["start_year"]), datetime.now().year + 1):
         for code in REPORTS.values():
-            raw.extend(modern(year, code) if year >= 2015 else legacy(year, code))
+            raw.extend(modern(year, code))
 
     data = []
     for year in range(max(2015, CFG["start_year"]), datetime.now().year + 1):
