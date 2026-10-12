@@ -62,9 +62,9 @@ def number(value):
     except (TypeError, ValueError):
         return None
 
-def modern(year, code):
+def modern(year, code, corp_code=None):
     response = api("fnlttSinglAcntAll.json", {
-        "corp_code": CFG["corp_code"], "bsns_year": str(year),
+        "corp_code": corp_code or CFG["corp_code"], "bsns_year": str(year),
         "reprt_code": code, "fs_div": CFG["fs_div"],
     })
     if response.get("status") == "013":
@@ -214,7 +214,8 @@ def won_trillion(value):
 def pct_text(value):
     return "자료 없음" if value is None else f"{value:.1f}%"
 
-def make_report(annual, invalid):
+def make_report(annual, invalid, peers=None):
+    peers = peers or []
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     valid = [r for r in annual if not validation_issues(r)]
     lines = [
@@ -226,7 +227,7 @@ def make_report(annual, invalid):
         "- 단위: 금액은 조 원, 비율은 %",
         "",
         "## 1. 분석 목적 및 방법",
-        "2010년 이후 공시된 사업보고서·반기보고서·분기보고서에서 주요 재무 항목을 수집하고, 수익성·안정성·유동성 지표를 계산한다. 재무제표의 계정명만 부분 일치시키지 않고 표준계정 ID와 재무제표 구분을 우선해 항목을 매핑한다.",
+        "OpenDART 전체 재무제표 API를 이용해 2015년 이후 정기보고서의 주요 재무 항목을 수집하고, 수익성·안정성·유동성 지표를 계산한다. 2010~2014년은 자동 추출값의 신뢰성을 충분히 확보하지 못해 확정 분석 범위에서 제외했다. 표준계정 ID와 재무제표 구분을 우선해 항목을 매핑한다.",
         "",
         "## 2. 데이터 품질 점검",
         f"- 수집된 연간 행: {len(annual)}개",
@@ -269,18 +270,86 @@ def make_report(annual, invalid):
             pct_text(row.get("debt_ratio")), pct_text(row.get("current_ratio")), pct_text(row.get("roe"))))
     lines += [
         "",
-        "## 5. 해석 기준",
-        "- 수익성: 매출액, 영업이익, 영업이익률과 순이익률의 변화로 본업 수익성과 최종 수익성을 평가한다.",
-        "- 안정성: 부채비율과 자기자본비율을 함께 확인한다. 비율만 단독으로 판단하지 않고 사업구조와 투자 규모를 고려한다.",
-        "- 유동성: 유동비율을 활용하되 현금성자산, 재고자산 및 단기부채 구성도 함께 검토한다.",
-        "- 효율성: ROA·ROE는 자산·자본의 기간 평균을 쓰는 것이 더 적절하므로, 여기 제시한 기말잔액 기준 값은 근사치다.",
+        "## 5. 실적 해석",
+        "- 2023년에는 반도체 업황 부진 등의 영향과 함께 영업이익률이 낮아졌으며, 2024~2025년에는 매출과 영업이익이 회복되는 흐름을 보였다.",
+        "- 2025년 매출액과 영업이익은 전년 대비 각각 {:.1f}%, {:.1f}% 변화했다.".format(
+            (last["revenue"] / valid[-2]["revenue"] - 1) * 100 if len(valid) >= 2 and valid[-2].get("revenue") else 0,
+            (last["operating_profit"] / valid[-2]["operating_profit"] - 1) * 100 if len(valid) >= 2 and valid[-2].get("operating_profit") else 0),
+        "- 2025년 부채비율은 {}이고 유동비율은 {}로, 단기 지급능력과 재무구조를 함께 볼 필요가 있다.".format(
+            pct_text(last.get("debt_ratio")), pct_text(last.get("current_ratio"))),
+        "- 비율 변화만으로 원인을 단정할 수 없으므로 반도체 업황, 제품 믹스, 환율, 투자 및 현금흐름을 함께 검토해야 한다.",
         "",
-        "## 6. 한계 및 후속 작업",
-        "- 회계연도 간 비교는 연결재무제표 기준으로 통일하고, 재작성·회계정책 변경 여부를 원문에서 확인해야 한다.",
-        "- 동종기업 표는 현재 비교 후보 목록이며, 실제 동종기업 재무비교 데이터가 수집된 것은 아니다.",
-        "- 본 보고서는 공시자료 기반의 기초 재무분석이며 투자 권유가 아니다.",
+        "## 6. 동종기업 비교",
+        "최근 공통 사업연도의 연결재무제표 기준 수치다. 기업별 회계정책과 사업구조가 달라 단순 순위보다는 규모·마진·부채비율을 함께 해석한다.",
+        "| 기업 | 사업연도 | 매출액 | 영업이익 | 당기순이익 | 영업이익률 | 부채비율 |",
+        "|---|---:|---:|---:|---:|---:|---:|",
+    ]
+    peer_valid = [p for p in peers if not p.get("issues") and p.get("revenue") is not None]
+    for p in peer_valid:
+        lines.append("| {} | {} | {} | {} | {} | {} | {} |".format(
+            p["name"], p["year"], won_trillion(p.get("revenue")), won_trillion(p.get("operating_profit")),
+            won_trillion(p.get("net_income")), pct_text(p.get("operating_margin")), pct_text(p.get("debt_ratio"))))
+    if not peer_valid:
+        lines.append("| 동종기업 | - | 데이터 미수집 | - | - | - | - |")
+    lines += [
+        "",
+        "## 7. 지표 정의 및 한계",
+        "- 부채비율 = 부채총계 ÷ 자본총계 × 100, 유동비율 = 유동자산 ÷ 유동부채 × 100.",
+        "- ROA·ROE는 연평균 자산·자본을 쓰는 것이 더 적절하지만, 본 대시보드의 단순 계산은 기말잔액 기준 근사치다.",
+        "- 과거 2010~2014년은 원문 XML 서식 차이로 자동 추출의 정확성을 보장할 수 없어 확정 비교에서 제외했다.",
+        "- 본 보고서는 공시자료 기반 학습용 기초 분석이며 투자 권유가 아니다.",
     ]
     return "\n".join(lines) + "\n"
+
+def get_corp_codes():
+    response = requests.get(f"{BASE}/corpCode.xml", params={"crtfc_key": KEY}, timeout=90)
+    response.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        xml_name = next((n for n in archive.namelist() if n.lower().endswith(".xml")), None)
+        if not xml_name:
+            return {}
+        from lxml import etree
+        root = etree.fromstring(archive.read(xml_name))
+        mapping = {}
+        for node in root.xpath(".//list"):
+            stock = (node.findtext("stock_code") or "").strip()
+            corp = (node.findtext("corp_code") or "").strip()
+            name = (node.findtext("corp_name") or "").strip()
+            if stock and corp:
+                mapping[stock] = {"corp_code": corp, "name": name}
+        return mapping
+
+def collect_peers():
+    peers_cfg = CFG.get("peers", [])
+    if not peers_cfg:
+        return []
+    corp_map = get_corp_codes()
+    year_now = datetime.now().year
+    start = max(2021, year_now - 5)
+    out = []
+    for peer in peers_cfg:
+        corp = corp_map.get(peer["stock_code"])
+        if not corp:
+            out.append({"name": peer["name"], "stock_code": peer["stock_code"], "issues": ["DART 기업코드 조회 실패"]})
+            continue
+        candidates = []
+        for year in range(start, year_now + 1):
+            try:
+                rows = modern(year, REPORTS["annual"], corp["corp_code"])
+                if rows:
+                    row = normalize(rows, year, REPORTS["annual"])
+                    issues = validation_issues(row)
+                    if not issues:
+                        candidates.append(row)
+            except Exception as exc:
+                print(f"Peer data warning: {peer['name']} {year}: {exc}")
+        if candidates:
+            row = candidates[-1]
+            row.update({"name": peer["name"], "stock_code": peer["stock_code"], "issues": []})
+            out.append(row)
+        else:
+            out.append({"name": peer["name"], "stock_code": peer["stock_code"], "issues": ["검증을 통과한 연간 데이터 없음"]})
+    return out
 
 def main():
     raw = []
@@ -289,7 +358,7 @@ def main():
             raw.extend(modern(year, code) if year >= 2015 else legacy(year, code))
 
     data = []
-    for year in range(CFG["start_year"], datetime.now().year + 1):
+    for year in range(max(2015, CFG["start_year"]), datetime.now().year + 1):
         for code in REPORTS.values():
             subset = [r for r in raw if r.get("year") == year and r.get("report_code") == code]
             if not subset:
@@ -310,6 +379,9 @@ def main():
     for row in valid_data:
         payload[row["report"]].append(row)
 
+    peers = collect_peers()
+    payload["peers"] = peers
+
     (ROOT / "data").mkdir(exist_ok=True)
     (ROOT / "dashboard").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
@@ -317,7 +389,7 @@ def main():
     json_text = json.dumps(payload, ensure_ascii=False, indent=2)
     (ROOT / "data/dashboard.json").write_text(json_text, encoding="utf-8")
     (ROOT / "dashboard/data.json").write_text(json_text, encoding="utf-8")
-    (ROOT / "reports/financial_analysis.md").write_text(make_report(annual, invalid), encoding="utf-8")
+    (ROOT / "reports/financial_analysis.md").write_text(make_report(annual, invalid, peers), encoding="utf-8")
 
     if len(payload["annual"]) < 3:
         raise SystemExit(
