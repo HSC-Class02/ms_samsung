@@ -320,7 +320,11 @@ def collect_peers():
     peers_cfg = CFG.get("peers", [])
     if not peers_cfg:
         return []
-    corp_map = get_corp_codes()
+    try:
+        corp_map = get_corp_codes()
+    except Exception as exc:
+        print(f"Peer company code lookup failed: {exc}")
+        return [{"name": p["name"], "stock_code": p["stock_code"], "issues": ["DART 기업코드 조회 실패"]} for p in peers_cfg]
     year_now = datetime.now().year
     start = max(2021, year_now - 5)
     out = []
