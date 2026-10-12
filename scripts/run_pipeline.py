@@ -272,11 +272,8 @@ def make_report(annual, invalid, peers=None):
         "",
         "## 5. 실적 해석",
         "- 2023년에는 반도체 업황 부진 등의 영향과 함께 영업이익률이 낮아졌으며, 2024~2025년에는 매출과 영업이익이 회복되는 흐름을 보였다.",
-        "- 2025년 매출액과 영업이익은 전년 대비 각각 {:.1f}%, {:.1f}% 변화했다.".format(
-            (last["revenue"] / valid[-2]["revenue"] - 1) * 100 if len(valid) >= 2 and valid[-2].get("revenue") else 0,
-            (last["operating_profit"] / valid[-2]["operating_profit"] - 1) * 100 if len(valid) >= 2 and valid[-2].get("operating_profit") else 0),
-        "- 2025년 부채비율은 {}이고 유동비율은 {}로, 단기 지급능력과 재무구조를 함께 볼 필요가 있다.".format(
-            pct_text(last.get("debt_ratio")), pct_text(last.get("current_ratio"))),
+        f"{last['year']}년 매출액과 영업이익은 전년 대비 각각 {((last['revenue'] / valid[-2]['revenue'] - 1) * 100):.1f}%, {((last['operating_profit'] / valid[-2]['operating_profit'] - 1) * 100):.1f}% 변화했다." if len(valid) >= 2 and valid[-2].get("revenue") and valid[-2].get("operating_profit") else "전년 대비 성장률은 비교 가능한 연간 데이터가 부족해 계산하지 않았다.",
+        f"{last['year']}년 부채비율은 {pct_text(last.get('debt_ratio'))}이고 유동비율은 {pct_text(last.get('current_ratio'))}로, 단기 지급능력과 재무구조를 함께 볼 필요가 있다.",
         "- 비율 변화만으로 원인을 단정할 수 없으므로 반도체 업황, 제품 믹스, 환율, 투자 및 현금흐름을 함께 검토해야 한다.",
         "",
         "## 6. 동종기업 비교",
